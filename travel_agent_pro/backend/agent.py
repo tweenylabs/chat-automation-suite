@@ -5,12 +5,17 @@ import asyncio
 import datetime
 import difflib
 import re
+import logging
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from notion_client import AsyncClient
 from tavily import TavilyClient
 from openai import OpenAI
 from dotenv import load_dotenv
 from backend.clarification.clarifier import QueryClarifier
+
+# Logging Configuration
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Absolute path enforcement for local environments
 _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -116,14 +121,14 @@ class TravelAgent:
             loc_name = json.loads(res.choices[0].message.content).get("entity", query)
         except: loc_name = query
 
-        print(f"🚀 DUAL-TRACK DISCOVERY: '{loc_name}'")
+        logger.info(f"DUAL-TRACK DISCOVERY: '{loc_name}'")
         found_item_ids = set()
         
         # --- TRACK 1: DATABASE SCAN (High Precision) ---
         # Querying the Cities DB for a direct match
         cities_db_id = self.db_registry.get("Cities")
         if cities_db_id:
-            print(f"   - Querying Cities DB: {cities_db_id}")
+            logger.info(f"Querying Cities DB: {cities_db_id}")
             db_res = await self._query_database(cities_db_id)
             clean_target = loc_name.strip().lower()
             
@@ -140,7 +145,7 @@ class TravelAgent:
                 
                 discovery_results["city_info"] = {"id": city["id"], "name": city["props"].get("Name", loc_name), "content": await self.get_row_body_content(city["id"]), "url": city.get("url")}
                 discovery_results["sources"].append({"title": f"City: {city['props'].get('Name', loc_name)}", "url": city.get("url"), "type": "Notion (DB)"})
-                print(f"   ✅ DB City Match: {city['props'].get('Name')}")
+                logger.info(f"DB City Match: {city['props'].get('Name')}")
                 
                 # Relational Scan: Scan Hotels, Restaurants, etc. for these City IDs/Names
                 for cat, db_id in self.db_registry.items():
@@ -160,10 +165,10 @@ class TravelAgent:
                             discovery_results["details"][cat].append(props)
                             discovery_results["sources"].append({"title": props.get("Name", "Untitled"), "url": row.get("url"), "type": "Notion (DB)"})
                             found_item_ids.add(row["id"])
-                            print(f"     -> Found {cat} in DB: {props.get('Name')}")
+                            logger.info(f"Found {cat} in DB: {props.get('Name')}")
 
         # --- TRACK 2: PAGE SEARCH FALLBACK (Broad Discovery) ---
-        print(f"   - Running Page Search Fallback...")
+        logger.info(f"Running Page Search Fallback...")
         try:
             search_res = await self.notion.search(query=loc_name)
             for p in search_res.get("results", []):
@@ -189,7 +194,7 @@ class TravelAgent:
                     if not discovery_results["city_info"] and clean_title == clean_loc:
                         discovery_results["city_info"] = {"id": p["id"], "name": title, "content": await self.get_row_body_content(p["id"]), "url": p.get("url")}
                         discovery_results["sources"].append({"title": f"City: {title}", "url": p.get("url"), "type": "Notion (Page)"})
-                        print(f"   ✅ Page City Match: {title}")
+                        logger.info(f"Page City Match: {title}")
                     else:
                         item_props = self._parse_properties(p.get("properties", {}))
                         item_props["Name"] = title
@@ -198,7 +203,7 @@ class TravelAgent:
                         discovery_results["details"][cat].append(item_props)
                         discovery_results["sources"].append({"title": title, "url": p.get("url"), "type": "Notion (Page)"})
                         found_item_ids.add(p["id"])
-                        print(f"     -> Found {cat} via Page: {title}")
+                        logger.info(f"Found {cat} via Page: {title}")
         except: pass
 
         return discovery_results
@@ -212,9 +217,9 @@ Your ONLY job is to analyze the user's trip query and gather the necessary varia
 
 [FEW-SHOT EXAMPLES]
 User: "plan a trip" -> Assistant: {"clarification_needed": true, "clarifications": [{"question": "Which destination are you planning to visit?", "example_answer": "Goa"}, {"question": "What are your travel dates or trip duration?", "example_answer": "3 days in June"}, {"question": "What type of trip are you looking for (party, relaxation, adventure)?", "example_answer": "Relaxation"}]}
-User: "suggest hotels in Goa" -> Assistant: {"clarification_needed": true, "clarifications": [{"question": "What is your budget per night?", "example_answer": "₹4,000–₹8,000"}, {"question": "How many guests?", "example_answer": "2 adults"}]}
-User: "good restaurants in Goa" -> Assistant: {"clarification_needed": true, "clarifications": [{"question": "What type of cuisine?", "example_answer": "Seafood"}, {"question": "What is your budget per person?", "example_answer": "₹1,500"}]}
-User: "3 day Paris itinerary for couple under €1000" -> Assistant: {"clarification_needed": false}
+User: "suggest hotels in Goa" -> Assistant: {"clarification_needed": true, "clarifications": [{"question": "What is your budget per night?", "example_answer": "INR 4,000-8,000"}, {"question": "How many guests?", "example_answer": "2 adults"}]}
+User: "good restaurants in Goa" -> Assistant: {"clarification_needed": true, "clarifications": [{"question": "What type of cuisine?", "example_answer": "Seafood"}, {"question": "What is your budget per person?", "example_answer": "INR 1,500"}]}
+User: "3 day Paris itinerary for couple under EUR 1000" -> Assistant: {"clarification_needed": false}
 
 [TRIVIAL LOOKUP OVERRIDE]
 - If the user is asking to EXCLUSIVELY view THEIR own existing data (e.g. "What are my hotels...", "Show my current restaurants...") and a City/Destination was mentioned in history:
@@ -245,7 +250,7 @@ STRICT MANDATES:
 
             # 4. Formulate Standalone Query
             if is_answer_turn:
-                print("🧠 Q&A MAPPING MODE: Syncing answers to specific questions.")
+                logger.info("Q&A MAPPING MODE: Syncing answers to specific questions.")
                 checklist_questions = last_asst["content"] if last_asst else ""
                 
                 opt_sys_p = (
@@ -275,7 +280,7 @@ STRICT MANDATES:
 
                 if is_follow_up:
                     # 3a. OPTIMIZER-FIRST for follow-ups
-                    print("🧠 FOLLOW-UP MODE: Running Optimizer first to build clean standalone.")
+                    logger.info("FOLLOW-UP MODE: Running Optimizer first to build clean standalone.")
                     h_str = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in history_list[-10:]])
                     opt_res = self.openai.chat.completions.create(
                         model="gpt-4o-mini",
@@ -294,7 +299,7 @@ STRICT MANDATES:
 
                 # 4. Clarifier Audit
                 clarification_result = self.clarifier.evaluate_query(clarification_input, sys_p_base, history)
-                print(f"DEBUG | Clarification Result: {json.dumps(clarification_result, indent=2)}")
+                logger.debug(f"Clarification Result: {json.dumps(clarification_result, indent=2)}")
 
                 if clarification_result.get("clarification_needed"):
                     meta_dump = json.dumps({"sources": [], "entities": [], "is_clarification": True})
@@ -331,19 +336,19 @@ STRICT MANDATES:
                 standalone = [line for line in standalone.split("\n") if line.strip()][-1]
             
             standalone = standalone.strip().strip('"').strip("'")
-            print(f"DEBUG | Sanitized Standalone: {standalone}")
+            logger.debug(f"Sanitized Standalone: {standalone}")
         else:
             standalone = user_query
 
         # --- EXECUTION TIER ---
-        print(f"\n🚀 EXECUTION: {standalone}\n")
+        logger.info(f"EXECUTION: {standalone}")
 
         notion_data, web_data = {"city_info": {}, "details": {}, "sources": []}, []
         if mode in ["Notion Only", "Hybrid"]:
             notion_data = await self.discover_hierarchy(standalone)
             if notion_data.get("error"):
                 yield f"METADATA|{json.dumps({'sources': [], 'is_clarification': False})}\n"
-                yield f"🚨 **Notion Error**: {notion_data['error']}\n\nPlease check if your page is shared with the correct integration!"
+                yield f"Notion Error: {notion_data['error']}\n\nPlease check if your page is shared with the correct integration!"
                 return
 
         has_notion = bool(notion_data.get("city_info"))
@@ -360,15 +365,15 @@ STRICT MANDATES:
                 if any(k in standalone.lower() for k in ["hotel", "restaurant", "stay", "food"]):
                     search_query += " official booking reservation site"
                 
-                print(f"🌐 FETCHING WEB DATA FOR: {standalone}")
+                logger.info(f"FETCHING WEB DATA FOR: {standalone}")
                 t_res = t_res = TavilyClient(api_key=os.getenv("TAVILY_API_KEY")).search(query=search_query[:390], search_depth="advanced", include_images=True)
                 web_data = [r for r in t_res.get("results", []) if r.get("score", 0) >= 0.70][:5]
                 web_images = t_res.get("images", [])
-                print(f"✅ Web Search Returned: {len(web_data)} results")
+                logger.info(f"Web Search Returned: {len(web_data)} results")
                 for i, res in enumerate(web_data[:2]):
-                    print(f"   [{i+1}] {res.get('title')} ({res.get('url')})")
+                    logger.info(f"   [{i+1}] {res.get('title')} ({res.get('url')})")
             except Exception as e:
-                print(f"⚠️ Tavily Search Error: {e}")
+                logger.error(f"Tavily Search Error: {e}")
                 web_data, web_images = [], []
 
         context = f"NOTION:\n{json.dumps(notion_data, indent=2)}\n\nWEB:\n{json.dumps(web_data, indent=2)}"
@@ -572,12 +577,12 @@ STRICT MANDATES:
         }
 
         print("\n" + "="*50)
-        print("🧬 INTENT-STRICT ENTITY EXTRACTION")
-        print(f"   Target: {standalone} | Intent: {cat_name if not is_trip_plan else 'Trip'}")
-        print(f"   Total Displayed Entities: {len(final_entities)}")
+        logger.info("INTENT-STRICT ENTITY EXTRACTION")
+        logger.info(f"   Target: {standalone} | Intent: {cat_name if not is_trip_plan else 'Trip'}")
+        logger.info(f"   Total Displayed Entities: {len(final_entities)}")
         for e in final_entities[:5]:
-            print(f"   - {e.get('name')} | Type: {e.get('type')}")
-        print("="*50 + "\n")
+            logger.info(f"   - {e.get('name')} | Type: {e.get('type')}")
+        logger.info("="*50)
 
         yield f"METADATA|{json.dumps(metadata)}\n"
 

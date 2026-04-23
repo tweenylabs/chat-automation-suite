@@ -1,5 +1,8 @@
 import json
+import logging
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 class QueryClarifier:
     def __init__(self):
@@ -36,7 +39,7 @@ History:
 - USER: Tell me about Tokyo
 - ASSISTANT: Tokyo is great! For a budget of $3000, it's amazing.
 - USER: Give me a plan
-Analysis: Location 東京 is from history (Lookup turn). Intent is now Plan. Location needs verification. Budget $3000 is from ASSISTANT, so it is MISSING.
+Analysis: Location Tokyo is from history (Lookup turn). Intent is now Plan. Location needs verification. Budget $3000 is from ASSISTANT, so it is MISSING.
 Result: Return clarification_needed: true, and ask about the Location first (or Budget).
 """
 
@@ -58,5 +61,5 @@ Result: Return clarification_needed: true, and ask about the Location first (or 
             raw_response = response.choices[0].message.content.strip()
             return json.loads(raw_response)
         except Exception as e:
-            print(f"⚠️ Clarifier Error: {e}")
+            logger.error(f"Clarifier Error: {e}")
             return {"clarification_needed": False, "query": query, "standalone": query}

@@ -1,11 +1,13 @@
 import os
 import httpx
+import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 CLIENT_ID = os.getenv("NOTION_CLIENT_ID")
@@ -48,7 +50,7 @@ async def callback(code: str):
         )
         
     if response.status_code != 200:
-        print(f"Token Error: {response.text}")
+        logger.error(f"Token Error: {response.text}")
         raise HTTPException(status_code=400, detail="Failed to retrieve access token from Notion")
         
     data = response.json()

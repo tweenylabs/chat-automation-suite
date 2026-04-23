@@ -11,7 +11,6 @@ load_dotenv()
 
 st.set_page_config(
     page_title="Notion Travel Pro | Elite Assistant",
-    page_icon="🗺️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -132,11 +131,11 @@ def login():
     st.markdown(f'<meta http-equiv="refresh" content="0; url={BACKEND_URL}/login">', unsafe_allow_html=True)
 
 if not token:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🧳 Notion Travel Pro</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>Notion Travel Pro</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #94a3b8;'>Elite travel intelligence for your Notion workspace.</p>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
-        if st.button("Connect Notion 🚀", use_container_width=True): login()
+        if st.button("Connect Notion", use_container_width=True): login()
 else:
     def render_entity_cards(entities):
         if not entities: return
@@ -188,7 +187,7 @@ else:
             
             maps_button = f'<a href="{maps_url}" target="_blank" class="maps-btn">View on Map</a>' if maps_url else ''
             
-            card_html += f'<div class="entity-card"><div class="entity-badge-container">{status_html}{offer_html}</div>{img_html}<div class="entity-content"><div class="entity-type">{itm["type"]} • {itm["source"]}</div><div class="entity-title">{clean_name}</div>{address_html}<div class="entity-meta"><span class="entity-rating">{rating_text}</span><span>{price_text}</span></div><div style="min-height: 40px;">{amenities_html}</div>{review_html}{book_button}{maps_button}</div></div>'
+            card_html += f'<div class="entity-card"><div class="entity-badge-container">{status_html}{offer_html}</div>{img_html}<div class="entity-content"><div class="entity-type">{itm["type"]} | {itm["source"]}</div><div class="entity-title">{clean_name}</div>{address_html}<div class="entity-meta"><span class="entity-rating">{rating_text}</span><span>{price_text}</span></div><div style="min-height: 40px;">{amenities_html}</div>{review_html}{book_button}{maps_button}</div></div>'
 
         card_html += '</div>'
         # Crucial: Use a unique container to prevent Streamlit from escaping or double-rendering
@@ -196,7 +195,7 @@ else:
 
     # Sidebar
     with st.sidebar:
-        st.markdown("### 🗺️ Intelligence Control")
+        st.markdown("### Intelligence Control")
         selected_mode = st.radio(
             "Knowledge Source",
             ["Hybrid", "Notion Only", "Web Only"],
@@ -204,7 +203,7 @@ else:
         )
         
         st.divider()
-        st.markdown("### 📅 Trip Planner")
+        st.markdown("### Trip Planner")
         selected_dates = st.date_input(
             "Expected Travel Dates",
             value=[],
@@ -212,12 +211,12 @@ else:
         )
         
         st.divider()
-        st.markdown("### 🧭 Explorer Tools")
+        st.markdown("### Explorer Tools")
         st.caption("Active Session")
         for _ in range(15): st.write("")
         st.divider()
-        st.markdown('<div class="status-green">● Notion Connected Session</div>', unsafe_allow_html=True)
-        if st.button("Sign Out 🚪", type="secondary", use_container_width=True):
+        st.markdown('<div class="status-green">Connected: Notion Session</div>', unsafe_allow_html=True)
+        if st.button("Sign Out", type="secondary", use_container_width=True):
             cookie_manager.delete("notion_token")
             st.session_state["logout_triggered"] = True
             # Nuke ALL session state variables for a clean slate
@@ -228,7 +227,7 @@ else:
     # Predefined Queries
     st.caption("Quick Insights")
     q_col1, q_col2, q_col3, q_col4 = st.columns(4)
-    quick_queries = ["Hotels in Barcelona 🏨", "Best Food in Paris 🍕", "London Itinerary 🎡", "Japan Weather 🏮"]
+    quick_queries = ["Hotels in Barcelona", "Best Food in Paris", "London Itinerary", "Japan Weather"]
     actual_queries = ["What are my hotels in Barcelona?", "Show my restaurant list for Paris", "Give me my itinerary for London", "Check weather in Japan"]
     selected_query = None
     if q_col1.button(quick_queries[0]): selected_query = actual_queries[0]
@@ -240,7 +239,7 @@ else:
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]): 
             if msg.get("type") == "sources":
-                with st.expander("🔍 View Sources & References", expanded=False):
+                with st.expander("View Sources & References", expanded=False):
                     st.markdown(msg["content"], unsafe_allow_html=True)
             elif msg.get("type") == "entities":
                 render_entity_cards(msg["data"])
@@ -252,7 +251,7 @@ else:
     
     is_confirmed = False
     if st.session_state.get("is_consent_required") and st.session_state.get("proposed_query"):
-        if st.button(f"Confirm & Search 🚀: {st.session_state.proposed_query}", type="primary", use_container_width=True):
+        if st.button(f"Confirm & Search: {st.session_state.proposed_query}", type="primary", use_container_width=True):
             prompt = st.session_state.proposed_query
             is_confirmed = True
             st.session_state.is_consent_required = False
@@ -308,7 +307,7 @@ else:
                         if not metadata_parsed:
                             buffer += chunk
                             # Handle error messages that might be sent as plain text from the agent
-                            if "🚨 **Notion Error**" in buffer:
+                            if "Notion Error" in buffer:
                                 placeholder.markdown(buffer)
                                 full_answer = buffer
                                 metadata_parsed = True
@@ -357,7 +356,7 @@ else:
                             source_links.append(f'<div class="source-tag"><a href="{s["url"]}" target="_blank">[{s["type"]}] {s["title"]}</a></div>')
                         source_content = " ".join(source_links)
                         with st.chat_message("assistant"):
-                            with st.expander("🔍 View Sources & References", expanded=False):
+                            with st.expander("View Sources & References", expanded=False):
                                 st.markdown(source_content, unsafe_allow_html=True)
                         st.session_state.messages.append({"role": "assistant", "content": source_content, "type": "sources"})
 
