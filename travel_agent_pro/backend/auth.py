@@ -5,7 +5,10 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 
-load_dotenv()
+# Use absolute path to .env (same pattern as agent.py)
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_env_path = os.path.join(_base_dir, ".env")
+load_dotenv(_env_path)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
